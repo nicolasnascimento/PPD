@@ -2,11 +2,15 @@
 // execute sequecial, and then with 1 slave
 
 /*
+PROBLEMA:
+	O objetivo do trabalho é implementar, usando a biblioteca MPI, uma versão paralela, usando o modelo mestre escravo, do algoritmo de ordenação Rank Sort.
+	O programa deverá receber como parâmetros de entrada um número N, representando o número de valores a ser testado e o nome de um arquivo, que contém a lista de valores inteiros a serem ordenados. Utilizar 3 casos de teste para realização das medições no cluster.
+	A saída que deve ser gerada é a lista ordenada (crescente) dos valores de entrada (1 valor por linha) e também o tempo de execução da aplicação.
 
-Gabriel Chiele
-Nicolas Nascimento
+SOLUÇÃO:
+	??
 
-Master-slave sorting implemetation - PPD
+Gabriel Chiele, Nicolas Nascimento - 29/03/2016
 
 */
 
@@ -15,7 +19,7 @@ Master-slave sorting implemetation - PPD
 #include <stdio.h>
 #include <time.h>
 
-// Uses Rank Sort to sort a given array and stores it in the targetArray
+// Realiza o Ranksort no vetor 'sourceArray' armazenando o resultado em 'targetArray' 
 void rankSort( int* targetArray, int* sourceArray, int size ) {
 	int index = 0;
 	int i, j;
@@ -30,7 +34,7 @@ void rankSort( int* targetArray, int* sourceArray, int size ) {
 	}
 }
 
-// Copy a part of the array variable, starting at arrayInitialPosition into the buffer array
+// Copia parte do vetor 'array', iniciando em 'arrayInitialPosition', e armazenando no vetor 'buffer'
 void copyArrayToBuffer(int* array, int* buffer, int arrayInitialPosition, int arrayLength) {
 	int i;
 	int j = 0;
@@ -40,7 +44,7 @@ void copyArrayToBuffer(int* array, int* buffer, int arrayInitialPosition, int ar
 	}
 }
 
-// Populates array variable with 'numberOfItems' number of values from a given file
+// Preenche o vetor 'array' com 'numberOfItems' valores a paritr de um arquivo
 void getArrayFromFileWithName( int* array, char* fileName, int numberOfItems ) {
 	FILE* fp = fopen(fileName, "r");
 	if( !fp ) {
@@ -49,14 +53,13 @@ void getArrayFromFileWithName( int* array, char* fileName, int numberOfItems ) {
 		int currentItem = 0;
 		while( currentItem < numberOfItems ) {
 			fscanf(fp,"%d",&(array[currentItem]));
-			//printf("array[%d] = %d\n", currentItem, array[currentItem]);
 			currentItem++;
 		}
 	}
 	fclose(fp);
 }
 
-// Concatenate the sourceArray into targetArray
+// Concatena o vetor 'sourceArray' no vetor 'targetArray'
 void concatenate(int* targetArray, int* sourceArray, int position, int length) {
 	int i, j;
 	for( i = position, j = 0; i < ( position + length); i++ ) {
@@ -64,6 +67,8 @@ void concatenate(int* targetArray, int* sourceArray, int position, int length) {
 		j++;
 	}
 }
+
+// Função auxiliar que mostar os valores em um array
 void printArray(int* array, int length) {
 	int i = 0;
 	for(i = 0; i < length; i++) {
@@ -101,47 +106,52 @@ void merge(int array[], int begin, int mid, int end) {
 
 int main(int argc, char **argv) {
 
+	// Confere a existência dos parâmetros necessários
 	if( argc != 3 ) {
 		printf("Incorrent number Of Arguments, expected 3\n");
 		return -1;
 	}
 
+	// Inicialização de variáveis
 	char* fileName = argv[2];
 	int arrayLength = atoi(argv[1]);
 	int array[arrayLength], sortedArray[arrayLength], buffer[arrayLength];
 	getArrayFromFileWithName(array, fileName, arrayLength);
 	time_t initialTime, finalTime;
 
+	// Inicialização do MPI
 	int rank,size;
 	MPI_Init(&argc, &argv);
   	MPI_Comm_rank(MPI_COMM_WORLD, &rank);
   	MPI_Comm_size(MPI_COMM_WORLD, &size);
 
 	printf("Main\n");
-	// Sequential
+	// Execução sequencial
 	if( size == 1 ) {
 		printf("Sequential\n");
 		time(&initialTime);
 		rankSort(sortedArray, array, arrayLength);
 		time(&finalTime);
 		printf("difftime = %lf\n", difftime(finalTime, initialTime));
+
+		// TODO - remover linhas abaixo, pois a saida deve ser em arquivo txt
 		/*printArray(sortedArray, arrayLength);
 		printf("---\n");
 		printArray(array, arrayLength);*/
-	// Master
+
+	// Código do Mestre
 	}else if( rank == 0 ) {
-		// Array size to give to all slaves
+		// Tamanho do vetor que será passado aos escravos
 		int pieceLength = arrayLength/(4*size);
+		// Variáveis auxiliares de controle
 		int amountSent = 0, firstExec = 1, i = 0;
 		int amountRecv = 0;
 		MPI_Status status;
 
 		time(&initialTime);
-		// Assures there will be no missing parts
-		// int divisionRest = arrayLength % (4*size);
 		while( amountSent < arrayLength ) {
 			if( firstExec ) {
-				// First Execution - Send a message to all slaves
+				// Na primeira execução, envia-se partes a todos os escravos
 				for( i = 1; i < size; i++ ) {
 					MPI_Send(array, arrayLength, MPI_INT, i, 0, MPI_COMM_WORLD);
 					MPI_Send(&(amountSent),1, MPI_INT, i, 0, MPI_COMM_WORLD);
@@ -150,21 +160,21 @@ int main(int argc, char **argv) {
 				}
 				firstExec = 0;
 			}else{
-				// Wait to receive response from a slave
+				// Espera a resposta de um escravo
 				MPI_Recv(buffer, pieceLength, MPI_INT, MPI_ANY_SOURCE, 0, MPI_COMM_WORLD, &status);
-				// Concatenate the array return by the slave into sortedArray
+				// Concatena o vetor retornado pelo escravo com o vetor 'sortedArray'
 				concatenate(sortedArray, buffer, amountRecv, pieceLength);
 				merge(sortedArray, 0, amountRecv, amountRecv + pieceLength);
 				amountRecv+= pieceLength;
 				int source = status.MPI_SOURCE;
-				// Send a new part to the slave that just finished his work
+				// Envia novo pedaço ao escravo que completou sua tarefa
 				MPI_Send(array, arrayLength, MPI_INT, source, 0, MPI_COMM_WORLD);
 				MPI_Send(&(amountSent),1, MPI_INT, source, 0, MPI_COMM_WORLD);
 				MPI_Send(&(pieceLength),1, MPI_INT, source, 0, MPI_COMM_WORLD);
 				amountSent += pieceLength;
 			}
 		}
-		// Send a message to the slaves, informing that the sorting is finished
+		// Envia uma menssagem aos escravos informando que acabou o trabalho
 		int done = -1;
 		for( i = 1; i < size; i++ ) {
 			MPI_Send(array, arrayLength, MPI_INT, i, 0, MPI_COMM_WORLD);
@@ -175,20 +185,20 @@ int main(int argc, char **argv) {
 		time(&finalTime);
 		printf("difftime = %lf\n", difftime(finalTime, initialTime));
 		printArray(sortedArray, arrayLength);
-	// Slave
+	// Código do Escravo
 	}else {
 		int position, length;
 		MPI_Status status;
 		while(1) {
-			// receive the array and the positions where he will start and end his operations
+			// Recebe o vetor e as posições que indicam em que parte do vetor ele deve trabalhar
 			MPI_Recv(buffer, arrayLength, MPI_INT, 0, 0, MPI_COMM_WORLD, &status);
 			MPI_Recv(&position, sizeof(int), MPI_INT, 0, 0, MPI_COMM_WORLD, &status);
 			MPI_Recv(&length, sizeof(int), MPI_INT, 0, 0, MPI_COMM_WORLD, &status);
-			// if positions received are -1, it means that the work is done
+			// Se as posições recebidas forem -1, significa que o trabalho acabou
 			if( position == -1 && length == -1 ) {
 				break;
 			}else{
-				// copy the his part into a smaller array, then sort and return to the master
+				// Copia a parte ordenada em um vetor menor para retornar ao Mestre
 				int copyBuffer[length], sortedBuffer[length];
 				copyArrayToBuffer(buffer, copyBuffer, position, length);
 				rankSort(sortedArray, copyBuffer, length);
