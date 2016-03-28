@@ -59,7 +59,7 @@ void getArrayFromFileWithName( int* array, char* fileName, int numberOfItems ) {
 // Concatenate the sourceArray into targetArray
 void concatenate(int* targetArray, int* sourceArray, int position, int length) {
 	int i, j;
-	for( i = position, j = 0; i < ( i + length); i++ ) {
+	for( i = position, j = 0; i < ( position + length); i++ ) {
 		targetArray[i] = sourceArray[j];
 		j++;
 	}
