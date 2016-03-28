@@ -26,7 +26,7 @@ void rankSort( int* targetArray, int* sourceArray, int size ) {
 				index++;
 			}
 		}
-		targetArray[i] = sourceArray[index];
+		targetArray[index] = sourceArray[i];
 	}
 }
 
@@ -49,7 +49,7 @@ void getArrayFromFileWithName( int* array, char* fileName, int numberOfItems ) {
 		int currentItem = 0;
 		while( currentItem < numberOfItems ) {
 			fscanf(fp,"%d",&(array[currentItem]));
-			printf("array[%d] = %d\n", currentItem, array[currentItem]);
+			//printf("array[%d] = %d\n", currentItem, array[currentItem]);
 			currentItem++;
 		}
 	}
@@ -60,9 +60,16 @@ void getArrayFromFileWithName( int* array, char* fileName, int numberOfItems ) {
 void concatenate(int* targetArray, int* sourceArray, int position, int length) {
 	int i, j;
 	for( i = position, j = 0; i < ( i + length); i++ ) {
-		target[i] = source[j];
+		targetArray[i] = sourceArray[j];
 		j++;
 	}
+}
+void printArray(int* array, int length) {
+	int i = 0;
+	for(i = 0; i < length; i++) {
+		printf("%d ", array[i]);
+	}
+	printf("\n");
 }
 
 /* Rotina que faz o merge de duas partes de um vetor.
@@ -110,12 +117,17 @@ int main(int argc, char **argv) {
   	MPI_Comm_rank(MPI_COMM_WORLD, &rank);
   	MPI_Comm_size(MPI_COMM_WORLD, &size);
 
+	printf("Main\n");
 	// Sequential
 	if( size == 1 ) {
+		printf("Sequential\n");
 		time(&initialTime);
 		rankSort(sortedArray, array, arrayLength);
 		time(&finalTime);
-		printf("difftime = %d\n", difftime(finalTime, initialTime));
+		printf("difftime = %lf\n", difftime(finalTime, initialTime));
+		/*printArray(sortedArray, arrayLength);
+		printf("---\n");
+		printArray(array, arrayLength);*/
 	// Master
 	}else if( rank == 0 ) {
 		// Array size to give to all slaves
@@ -123,7 +135,6 @@ int main(int argc, char **argv) {
 		int amountSent = 0, firstExec = 1, i = 0;
 		int amountRecv = 0;
 		MPI_Status status;
-		ArrayPortion portion;
 
 		time(&initialTime);
 		// Assures there will be no missing parts
@@ -132,45 +143,47 @@ int main(int argc, char **argv) {
 			if( firstExec ) {
 				// First Execution - Send a message to all slaves
 				for( i = 1; i < size; i++ ) {
-					MPI_Send(array, arrayLength, MPI_INT, i, NULL, MPI_COMM_WORLD);
-					MPI_Send(&(amountSent),1, MPI_INT, i, NULL, MPI_COMM_WORLD);
-					MPI_Send(&(arrayLength),1, MPI_INT, i, NULL, MPI_COMM_WORLD);
-					amountSent += arrayPortion;
+					MPI_Send(array, arrayLength, MPI_INT, i, 0, MPI_COMM_WORLD);
+					MPI_Send(&(amountSent),1, MPI_INT, i, 0, MPI_COMM_WORLD);
+					MPI_Send(&(pieceLength),1, MPI_INT, i, 0, MPI_COMM_WORLD);
+					amountSent += pieceLength;
 				}
 				firstExec = 0;
 			}else{
 				// Wait to receive response from a slave
-				MPI_Recv(buffer, pieceLength, MPI_INT, MPI_ANY_SOURCE, NULL, MPI_COMM_WORLD, &status);
+				MPI_Recv(buffer, pieceLength, MPI_INT, MPI_ANY_SOURCE, 0, MPI_COMM_WORLD, &status);
 				// Concatenate the array return by the slave into sortedArray
 				concatenate(sortedArray, buffer, amountRecv, pieceLength);
-				merge(sortedArray, 0, amountRecv, amountRecv + pieceLenth);
-				amountRecv+= arrayPortion;
+				merge(sortedArray, 0, amountRecv, amountRecv + pieceLength);
+				amountRecv+= pieceLength;
 				int source = status.MPI_SOURCE;
 				// Send a new part to the slave that just finished his work
-				MPI_Send(array, arrayLength, MPI_INT, source, NULL, MPI_COMM_WORLD);
-				MPI_Send(&(amountSent),1, MPI_INT, source, NULL, MPI_COMM_WORLD);
-				MPI_Send(&(arrayLength),1, MPI_INT, source, NULL, MPI_COMM_WORLD);
-				amountSent += arrayPortion;
+				MPI_Send(array, arrayLength, MPI_INT, source, 0, MPI_COMM_WORLD);
+				MPI_Send(&(amountSent),1, MPI_INT, source, 0, MPI_COMM_WORLD);
+				MPI_Send(&(pieceLength),1, MPI_INT, source, 0, MPI_COMM_WORLD);
+				amountSent += pieceLength;
 			}
 		}
 		// Send a message to the slaves, informing that the sorting is finished
 		int done = -1;
 		for( i = 1; i < size; i++ ) {
-			MPI_Send(array, arrayLength, MPI_INT, i, NULL, MPI_COMM_WORLD);
-			MPI_Send(&(done),1, MPI_INT, i, NULL, MPI_COMM_WORLD);
-			MPI_Send(&(done),1, MPI_INT, i, NULL, MPI_COMM_WORLD);
+			MPI_Send(array, arrayLength, MPI_INT, i, 0, MPI_COMM_WORLD);
+			MPI_Send(&(done),1, MPI_INT, i, 0, MPI_COMM_WORLD);
+			MPI_Send(&(done),1, MPI_INT, i, 0, MPI_COMM_WORLD);
 		}
 
 		time(&finalTime);
-		printf("difftime = %d\n", difftime(finalTime, initialTime));
+		printf("difftime = %lf\n", difftime(finalTime, initialTime));
+		printArray(sortedArray, arrayLength);
 	// Slave
 	}else {
 		int position, length;
+		MPI_Status status;
 		while(1) {
 			// receive the array and the positions where he will start and end his operations
-			MPI_Recv(buffer, arrayLength, MPI_INT, 0, NULL, MPI_COMM_WORLD, &status);
-			MPI_Recv(&position, sizeof(int),arrayLength, MPI_INT, 0, NULL, MPI_COMM_WORLD, &status);
-			MPI_Recv(&length, sizeof(int), MPI_INT, 0, NULL, MPI_COMM_WORLD, &status);
+			MPI_Recv(buffer, arrayLength, MPI_INT, 0, 0, MPI_COMM_WORLD, &status);
+			MPI_Recv(&position, sizeof(int), MPI_INT, 0, 0, MPI_COMM_WORLD, &status);
+			MPI_Recv(&length, sizeof(int), MPI_INT, 0, 0, MPI_COMM_WORLD, &status);
 			// if positions received are -1, it means that the work is done
 			if( position == -1 && length == -1 ) {
 				break;
@@ -179,11 +192,10 @@ int main(int argc, char **argv) {
 				int copyBuffer[length], sortedBuffer[length];
 				copyArrayToBuffer(buffer, copyBuffer, position, length);
 				rankSort(sortedArray, copyBuffer, length);
-				MPI_Send(sortedArray, length, MPI_INT, 0, NULL, MPI_COMM_WORLD);
+				MPI_Send(sortedArray, length, MPI_INT, 0, 0, MPI_COMM_WORLD);
 			}
 		}
 	}
 
   	MPI_Finalize();
-  	return 0;
 }
