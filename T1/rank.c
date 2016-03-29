@@ -163,41 +163,45 @@ int main(int argc, char **argv) {
 		MPI_Status status;
 
 		time(&initialTime);
-		while( amountSent < arrayLength ) {
-			if( firstExec ) {
+        int sent=size-1, received=0;
+		
 				// Na primeira execução, envia-se partes a todos os escravos
-                		printf("sending first piece\n");
-				for( i = 1; i < size; i++ ) {
+                		//printf("sending first piece\n");
+        for( i = 1; i < size; i++ ) {
 					MPI_Send(array, arrayLength, MPI_INT, i, 0, MPI_COMM_WORLD);
 					MPI_Send(&(amountSent),1, MPI_INT, i, 0, MPI_COMM_WORLD);
 					MPI_Send(&(pieceLength),1, MPI_INT, i, 0, MPI_COMM_WORLD);
 					amountSent += pieceLength;
-				}
-				firstExec = 0;
-			}else{
-               			printf("receiving piece\n");
+        }
+                
+        while( received < sent ) {
+               			//printf("receiving piece\n");
 				// Espera a resposta de um escravo
 				MPI_Recv(buffer, pieceLength, MPI_INT, MPI_ANY_SOURCE, 0, MPI_COMM_WORLD, &status);
 				// Concatena o vetor retornado pelo escravo com o vetor 'sortedArray'
-                		printf("Concatenating piece\n");
+                		//printf("Concatenating piece\n");
 				concatenate(sortedArray, buffer, amountRecv, pieceLength);
 				merge(sortedArray, 0, amountRecv, amountRecv + pieceLength);
 				amountRecv+= pieceLength;
+                received++;
 				int source = status.MPI_SOURCE;
-                		printf("sending piece\n");
+                		//printf("sending piece\n");
 				// Envia novo pedaço ao escravo que completou sua tarefa
-				if ((amountSent + pieceLength) > arrayLength){
-					pieceLength = arrayLength % (4*size);
-				}
-				MPI_Send(array, arrayLength, MPI_INT, source, 0, MPI_COMM_WORLD);
-				MPI_Send(&(amountSent),1, MPI_INT, source, 0, MPI_COMM_WORLD);
-				MPI_Send(&(pieceLength),1, MPI_INT, source, 0, MPI_COMM_WORLD);
-				amountSent += pieceLength;
-			}
-		}
+                if (amountSent < arrayLength) {
+				  if ((amountSent + pieceLength) > arrayLength){
+				    	pieceLength = arrayLength % (4*size);
+				  }
+				  MPI_Send(array, arrayLength, MPI_INT, source, 0, MPI_COMM_WORLD);
+				  MPI_Send(&(amountSent),1, MPI_INT, source, 0, MPI_COMM_WORLD);
+				  MPI_Send(&(pieceLength),1, MPI_INT, source, 0, MPI_COMM_WORLD);
+				  amountSent += pieceLength;
+                  sent++;
+                }
+        }
+		
 		// Envia uma menssagem aos escravos informando que acabou o trabalho
 		int done = -1;
-        	printf("sending done message\n");
+        	printf("sending done message \n");
 		for( i = 1; i < size; i++ ) {
 			MPI_Send(array, arrayLength, MPI_INT, i, 0, MPI_COMM_WORLD);
 			MPI_Send(&(done),1, MPI_INT, i, 0, MPI_COMM_WORLD);
@@ -213,13 +217,17 @@ int main(int argc, char **argv) {
 	}else {
 		int position, length;
 		MPI_Status status;
+        int count = 0;
 		while(1) {
-            		printf("receiving piece to sort\n");
-			// Recebe o vetor e as posições que indicam em que parte do vetor ele deve trabalhar
+            
+            // Recebe o vetor e as posições que indicam em que parte do vetor ele deve trabalhar
 			MPI_Recv(buffer, arrayLength, MPI_INT, 0, 0, MPI_COMM_WORLD, &status);
 			MPI_Recv(&position, sizeof(int), MPI_INT, 0, 0, MPI_COMM_WORLD, &status);
 			MPI_Recv(&length, sizeof(int), MPI_INT, 0, 0, MPI_COMM_WORLD, &status);
-			// Se as posições recebidas forem -1, significa que o trabalho acabou
+			
+            printf("receiving piece to sort: %d:%d:%d\n",rank,length,count);
+
+            // Se as posições recebidas forem -1, significa que o trabalho acabou
 			if( position == -1 && length == -1 ) {
 				break;
 			}else{
@@ -227,7 +235,7 @@ int main(int argc, char **argv) {
 				int copyBuffer[length], sortedBuffer[length];
 				copyArrayToBuffer(buffer, copyBuffer, position, length);
 				rankSort(sortedArray, copyBuffer, length);
-                		printf("sending sorted piece\n");
+                		printf("sending sorted piece %d:%d\n", rank,count++);
 				MPI_Send(sortedArray, length, MPI_INT, 0, 0, MPI_COMM_WORLD);
 			}
 		}
