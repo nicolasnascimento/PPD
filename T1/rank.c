@@ -60,6 +60,7 @@ void getArrayFromFileWithName( int* array, char* fileName, int numberOfItems ) {
 	fclose(fp);
 }
 
+// Escreve o tempo gasto e o vetor resultante para um arquivo
 void writeDeltaTimeAndArrayToFileWithName(double delta, int* array, int arrayLength, char* fileName) {
     FILE* fp = fopen(fileName, "w");
     if( !fp ) {
@@ -119,6 +120,13 @@ void merge(int array[], int begin, int mid, int end) {
     for (j=0, ib=begin; ib<end; j++, ib++) array[ib] = b[j];
 }
 
+// Retorna o tempo atual em milisegundos
+double getCurrentTimeMS(){
+	struct timeval time;
+	gettimeofday(&time, NULL);
+	return  (time.tv_sec) * 1000 + (time.tv_usec) / 1000;
+}
+
 int main(int argc, char **argv) {
 
 	// Confere a existência dos parâmetros necessários
@@ -134,8 +142,6 @@ int main(int argc, char **argv) {
 	getArrayFromFileWithName(array, fileName, arrayLength);
 	double initialTime, finalTime;
 
-	struct timeval  tv;
-
 	// Inicialização do MPI
 	int rank,size;
 	MPI_Init(&argc, &argv);
@@ -143,100 +149,83 @@ int main(int argc, char **argv) {
   	MPI_Comm_size(MPI_COMM_WORLD, &size);
 
 	printf("Main\n");
+
 	// Execução sequencial
 	if( size == 1 ) {
 		printf("Sequential\n");
-		gettimeofday(&tv, NULL);
-		initialTime =  (tv.tv_sec) * 1000 + (tv.tv_usec) / 1000;
+		initialTime =  getCurrentTimeMS();
 		rankSort(sortedArray, array, arrayLength);
-		gettimeofday(&tv, NULL);
-		finalTime =  (tv.tv_sec) * 1000 + (tv.tv_usec) / 1000;
+		finalTime =  getCurrentTimeMS();
 		printf("difftime = %lf\n", (finalTime - initialTime));
-
-		// TODO - remover linhas abaixo, pois a saida deve ser em arquivo txt
-		/*printArray(sortedArray, arrayLength);
-		printf("---\n");
-		printArray(array, arrayLength);*/
 
 	// Código do Mestre
 	}else if( rank == 0 ) {
+
 		// Tamanho do vetor que será passado aos escravos
 		int pieceLength = arrayLength/(4*size);
+
 		// Variáveis auxiliares de controle
 		int amountSent = 0, firstExec = 1, i = 0;
 		int amountRecv = 0;
 		MPI_Status status;
+		int sent=size-1, received=0;
+		initialTime =  getCurrentTimeMS();
 
-
-		gettimeofday(&tv, NULL);
-
-		initialTime =  (tv.tv_sec) * 1000 + (tv.tv_usec) / 1000;
-		//time(&initialTime);
-        int sent=size-1, received=0;
-		
-	// Na primeira execução, envia-se partes a todos os escravos
-	//printf("sending first piece\n");
-        for( i = 1; i < size; i++ ) {
-					MPI_Send(array, arrayLength, MPI_INT, i, 0, MPI_COMM_WORLD);
-					MPI_Send(&(amountSent),1, MPI_INT, i, 0, MPI_COMM_WORLD);
-					MPI_Send(&(pieceLength),1, MPI_INT, i, 0, MPI_COMM_WORLD);
-					amountSent += pieceLength;
-        }
+		// Na primeira execução, envia-se partes a todos os escravos
+		for( i = 1; i < size; i++ ) {
+			MPI_Send(array, arrayLength, MPI_INT, i, 0, MPI_COMM_WORLD);
+			MPI_Send(&(amountSent),1, MPI_INT, i, 0, MPI_COMM_WORLD);
+			MPI_Send(&(pieceLength),1, MPI_INT, i, 0, MPI_COMM_WORLD);
+			amountSent += pieceLength;
+        	}
                 
-        while( received < sent ) {
-               			//printf("receiving piece\n");
-				// Espera a resposta de um escravo
-				MPI_Recv(buffer, pieceLength, MPI_INT, MPI_ANY_SOURCE, 0, MPI_COMM_WORLD, &status);
-				// Concatena o vetor retornado pelo escravo com o vetor 'sortedArray'
-                		//printf("Concatenating piece\n");
-				concatenate(sortedArray, buffer, amountRecv, pieceLength);
-				merge(sortedArray, 0, amountRecv, amountRecv + pieceLength);
-				amountRecv+= pieceLength;
-                received++;
-				int source = status.MPI_SOURCE;
-                		//printf("sending piece\n");
-				// Envia novo pedaço ao escravo que completou sua tarefa
-                if (amountSent < arrayLength) {
-				  if ((amountSent + pieceLength) > arrayLength){
+		while( received < sent ) {
+			// Espera a resposta de um escravo
+			MPI_Recv(buffer, pieceLength, MPI_INT, MPI_ANY_SOURCE, 0, MPI_COMM_WORLD, &status);
+
+			// Concatena o vetor retornado pelo escravo com o vetor 'sortedArray'
+			concatenate(sortedArray, buffer, amountRecv, pieceLength);
+			merge(sortedArray, 0, amountRecv, amountRecv + pieceLength);
+			amountRecv+= pieceLength;
+		        received++;
+			int source = status.MPI_SOURCE;
+
+			// Envia novo pedaço ao escravo que completou sua tarefa
+		        if (amountSent < arrayLength) {
+				if ((amountSent + pieceLength) > arrayLength){
 				    	pieceLength = arrayLength % (4*size);
-				  }
-				  MPI_Send(array, arrayLength, MPI_INT, source, 0, MPI_COMM_WORLD);
-				  MPI_Send(&(amountSent),1, MPI_INT, source, 0, MPI_COMM_WORLD);
-				  MPI_Send(&(pieceLength),1, MPI_INT, source, 0, MPI_COMM_WORLD);
-				  amountSent += pieceLength;
-                  sent++;
-                }
-        }
+				}
+				MPI_Send(array, arrayLength, MPI_INT, source, 0, MPI_COMM_WORLD);
+				MPI_Send(&(amountSent),1, MPI_INT, source, 0, MPI_COMM_WORLD);
+				MPI_Send(&(pieceLength),1, MPI_INT, source, 0, MPI_COMM_WORLD);
+				amountSent += pieceLength;
+				sent++;
+		        }
+		}
 		
 		// Envia uma menssagem aos escravos informando que acabou o trabalho
 		int done = -1;
-        	printf("sending done message \n");
 		for( i = 1; i < size; i++ ) {
 			MPI_Send(array, arrayLength, MPI_INT, i, 0, MPI_COMM_WORLD);
 			MPI_Send(&(done),1, MPI_INT, i, 0, MPI_COMM_WORLD);
 			MPI_Send(&(done),1, MPI_INT, i, 0, MPI_COMM_WORLD);
 		}
-		gettimeofday(&tv, NULL);
-		finalTime =  (tv.tv_sec) * 1000 + (tv.tv_usec) / 1000;
-        
-		printf("difftime = %lf\n", finalTime - initialTime);
-		//printArray(sortedArray, arrayLength);
-        writeDeltaTimeAndArrayToFileWithName(finalTime - initialTime, sortedArray, arrayLength, "output.txt");
+		finalTime =  getCurrentTimeMS();
+        	writeDeltaTimeAndArrayToFileWithName(finalTime - initialTime, sortedArray, arrayLength, "output.txt");
+
 	// Código do Escravo
 	}else {
 		int position, length;
 		MPI_Status status;
-        int count = 0;
+        	int count = 0;
 		while(1) {
             
-            // Recebe o vetor e as posições que indicam em que parte do vetor ele deve trabalhar
+		    	// Recebe o vetor e as posições que indicam em que parte do vetor ele deve trabalhar
 			MPI_Recv(buffer, arrayLength, MPI_INT, 0, 0, MPI_COMM_WORLD, &status);
 			MPI_Recv(&position, sizeof(int), MPI_INT, 0, 0, MPI_COMM_WORLD, &status);
 			MPI_Recv(&length, sizeof(int), MPI_INT, 0, 0, MPI_COMM_WORLD, &status);
 			
-            printf("receiving piece to sort: %d:%d:%d\n",rank,length,count);
-
-            // Se as posições recebidas forem -1, significa que o trabalho acabou
+		   	 // Se as posições recebidas forem -1, significa que o trabalho acabou
 			if( position == -1 && length == -1 ) {
 				break;
 			}else{
@@ -244,7 +233,7 @@ int main(int argc, char **argv) {
 				int copyBuffer[length], sortedBuffer[length];
 				copyArrayToBuffer(buffer, copyBuffer, position, length);
 				rankSort(sortedArray, copyBuffer, length);
-                		printf("sending sorted piece %d:%d\n", rank,count++);
+				printf("sending sorted piece %d:%d\n", rank,count++);
 				MPI_Send(sortedArray, length, MPI_INT, 0, 0, MPI_COMM_WORLD);
 			}
 		}
