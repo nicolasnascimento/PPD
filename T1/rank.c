@@ -17,6 +17,7 @@ Gabriel Chiele, Nicolas Nascimento - 29/03/2016
 #include <mpi.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <sys/time.h>
 #include <time.h>
 
 // Realiza o Ranksort no vetor 'sourceArray' armazenando o resultado em 'targetArray' 
@@ -131,7 +132,9 @@ int main(int argc, char **argv) {
 	int arrayLength = atoi(argv[1]);
 	int array[arrayLength], sortedArray[arrayLength], buffer[arrayLength];
 	getArrayFromFileWithName(array, fileName, arrayLength);
-	time_t initialTime, finalTime;
+	double initialTime, finalTime;
+
+	struct timeval  tv;
 
 	// Inicialização do MPI
 	int rank,size;
@@ -143,10 +146,12 @@ int main(int argc, char **argv) {
 	// Execução sequencial
 	if( size == 1 ) {
 		printf("Sequential\n");
-		time(&initialTime);
+		gettimeofday(&tv, NULL);
+		initialTime =  (tv.tv_sec) * 1000 + (tv.tv_usec) / 1000;
 		rankSort(sortedArray, array, arrayLength);
-		time(&finalTime);
-		printf("difftime = %lf\n", difftime(finalTime, initialTime));
+		gettimeofday(&tv, NULL);
+		finalTime =  (tv.tv_sec) * 1000 + (tv.tv_usec) / 1000;
+		printf("difftime = %lf\n", (finalTime - initialTime));
 
 		// TODO - remover linhas abaixo, pois a saida deve ser em arquivo txt
 		/*printArray(sortedArray, arrayLength);
@@ -162,11 +167,15 @@ int main(int argc, char **argv) {
 		int amountRecv = 0;
 		MPI_Status status;
 
-		time(&initialTime);
+
+		gettimeofday(&tv, NULL);
+
+		initialTime =  (tv.tv_sec) * 1000 + (tv.tv_usec) / 1000;
+		//time(&initialTime);
         int sent=size-1, received=0;
 		
-				// Na primeira execução, envia-se partes a todos os escravos
-                		//printf("sending first piece\n");
+	// Na primeira execução, envia-se partes a todos os escravos
+	//printf("sending first piece\n");
         for( i = 1; i < size; i++ ) {
 					MPI_Send(array, arrayLength, MPI_INT, i, 0, MPI_COMM_WORLD);
 					MPI_Send(&(amountSent),1, MPI_INT, i, 0, MPI_COMM_WORLD);
@@ -207,12 +216,12 @@ int main(int argc, char **argv) {
 			MPI_Send(&(done),1, MPI_INT, i, 0, MPI_COMM_WORLD);
 			MPI_Send(&(done),1, MPI_INT, i, 0, MPI_COMM_WORLD);
 		}
-
-		time(&finalTime);
+		gettimeofday(&tv, NULL);
+		finalTime =  (tv.tv_sec) * 1000 + (tv.tv_usec) / 1000;
         
-		printf("difftime = %lf\n", difftime(finalTime, initialTime));
+		printf("difftime = %lf\n", finalTime - initialTime);
 		//printArray(sortedArray, arrayLength);
-        writeDeltaTimeAndArrayToFileWithName(difftime(finalTime, initialTime), sortedArray, arrayLength, "output.txt");
+        writeDeltaTimeAndArrayToFileWithName(finalTime - initialTime, sortedArray, arrayLength, "output.txt");
 	// Código do Escravo
 	}else {
 		int position, length;
