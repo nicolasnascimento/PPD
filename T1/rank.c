@@ -166,7 +166,7 @@ int main(int argc, char **argv) {
 		while( amountSent < arrayLength ) {
 			if( firstExec ) {
 				// Na primeira execução, envia-se partes a todos os escravos
-                printf("sending first piece\n");
+                		printf("sending first piece\n");
 				for( i = 1; i < size; i++ ) {
 					MPI_Send(array, arrayLength, MPI_INT, i, 0, MPI_COMM_WORLD);
 					MPI_Send(&(amountSent),1, MPI_INT, i, 0, MPI_COMM_WORLD);
@@ -175,17 +175,20 @@ int main(int argc, char **argv) {
 				}
 				firstExec = 0;
 			}else{
-                printf("receiving piece\n");
+               			printf("receiving piece\n");
 				// Espera a resposta de um escravo
 				MPI_Recv(buffer, pieceLength, MPI_INT, MPI_ANY_SOURCE, 0, MPI_COMM_WORLD, &status);
 				// Concatena o vetor retornado pelo escravo com o vetor 'sortedArray'
-                printf("Concatenating piece\n");
+                		printf("Concatenating piece\n");
 				concatenate(sortedArray, buffer, amountRecv, pieceLength);
 				merge(sortedArray, 0, amountRecv, amountRecv + pieceLength);
 				amountRecv+= pieceLength;
 				int source = status.MPI_SOURCE;
-                printf("sending piece\n");
+                		printf("sending piece\n");
 				// Envia novo pedaço ao escravo que completou sua tarefa
+				if ((amountSent + pieceLength) > arrayLength){
+					pieceLength = arrayLength % (4*size)
+				}
 				MPI_Send(array, arrayLength, MPI_INT, source, 0, MPI_COMM_WORLD);
 				MPI_Send(&(amountSent),1, MPI_INT, source, 0, MPI_COMM_WORLD);
 				MPI_Send(&(pieceLength),1, MPI_INT, source, 0, MPI_COMM_WORLD);
@@ -194,7 +197,7 @@ int main(int argc, char **argv) {
 		}
 		// Envia uma menssagem aos escravos informando que acabou o trabalho
 		int done = -1;
-        printf("sending done message\n");
+        	printf("sending done message\n");
 		for( i = 1; i < size; i++ ) {
 			MPI_Send(array, arrayLength, MPI_INT, i, 0, MPI_COMM_WORLD);
 			MPI_Send(&(done),1, MPI_INT, i, 0, MPI_COMM_WORLD);
@@ -203,7 +206,7 @@ int main(int argc, char **argv) {
 
 		time(&finalTime);
         
-		//sprintf(message, "difftime = %lf\n", difftime(finalTime, initialTime));
+		printf("difftime = %lf\n", difftime(finalTime, initialTime));
 		//printArray(sortedArray, arrayLength);
         writeDeltaTimeAndArrayToFileWithName(difftime(finalTime, initialTime), sortedArray, arrayLength, "output.txt");
 	// Código do Escravo
@@ -211,7 +214,7 @@ int main(int argc, char **argv) {
 		int position, length;
 		MPI_Status status;
 		while(1) {
-            printf("receiving piece to sort\n");
+            		printf("receiving piece to sort\n");
 			// Recebe o vetor e as posições que indicam em que parte do vetor ele deve trabalhar
 			MPI_Recv(buffer, arrayLength, MPI_INT, 0, 0, MPI_COMM_WORLD, &status);
 			MPI_Recv(&position, sizeof(int), MPI_INT, 0, 0, MPI_COMM_WORLD, &status);
@@ -224,7 +227,7 @@ int main(int argc, char **argv) {
 				int copyBuffer[length], sortedBuffer[length];
 				copyArrayToBuffer(buffer, copyBuffer, position, length);
 				rankSort(sortedArray, copyBuffer, length);
-                printf("sending sorted piece\n");
+                		printf("sending sorted piece\n");
 				MPI_Send(sortedArray, length, MPI_INT, 0, 0, MPI_COMM_WORLD);
 			}
 		}
