@@ -187,7 +187,7 @@ int main(int argc, char **argv) {
                 		printf("sending piece\n");
 				// Envia novo pedaço ao escravo que completou sua tarefa
 				if ((amountSent + pieceLength) > arrayLength){
-					pieceLength = arrayLength % (4*size)
+					pieceLength = arrayLength % (4*size);
 				}
 				MPI_Send(array, arrayLength, MPI_INT, source, 0, MPI_COMM_WORLD);
 				MPI_Send(&(amountSent),1, MPI_INT, source, 0, MPI_COMM_WORLD);
