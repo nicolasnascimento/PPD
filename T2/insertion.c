@@ -86,7 +86,12 @@ int main(int argc, char **argv) {
 	int arrayLength = atoi(argv[1]);
 	int array[arrayLength], sortedArray[arrayLength], buffer[arrayLength];
 	getArrayFromFileWithName(array, fileName, arrayLength);
+	getArrayFromFileWithName(sortedArray[arrayLength], fileName, arrayLength)
 	double initialTime, finalTime;
+	MPI_Status status;
+	int valueReceived = 0;
+	int doneMessage = -1;
+	int elementsSorted = 0;
 
 	// Inicialização do MPI
 	int rank,size;
@@ -101,29 +106,83 @@ int main(int argc, char **argv) {
 	
 	// Primeiro Estágio do Pipe
 	if( rank == 0 ) {
-		int elementsSorted = 0;
 		for( int i = 0; i < arrayLength; i++, elementsSorted++ ) {
 			int lastValue = sortedArray[sortedArrayPosition + pieceLength - 1];
-		
+			
+			// Ordena o vetor enquanto não estiver cheio			
+			if( elementsSorted < pieceLength ) {
+				sortedArray[i] = array[i];
+				insertionSort(sortedArray, sortedArrayPosition, sortedArray, elementsSorted);
+				elementsSorted++;
 			// Se último valor de 'sortedArray' for menor do que o valor testado, envia para o próximo estágio
-			if( lastValue < array[i] ) {
-				//MPI_Send();			
+			}else if( lastValue < array[i]  ) {
+				//sortedArray[elementsSorted] = array[elementsSorted];
+				MPI_Send(&(array[i]), sizeof(int), MPI_INT, rank + 1, 0, MPI_COMM_WORLD);	
 			// Senão, ordena e manda o último valor para o pŕoximo estágio			
-			}else{
-				//MPI_Send()
+			}else {
+				sortedArray[elementsSorted] = array[elementsSorted]
+				insertionSort(sortedArray, sortedArrayPosition, sortedArray, elementSorted);
+				MPI_Send(&(sortedArray[elementsSorted]), sizeof(int), MPI_INT, rank + 1, 0, MPI_COMM_WORLD);
 			}		
 		}
-		
+		// Imprime o array ordenado e manda a mensagem de "finalizado"
+		MPI_Recv(&valueReceived, sizeof(int), MPI_INT, size - 1, 0, MPI_COMM_WORLD, &status);
+		if( valueReceived == -1 ) {
+			printArray(sortedArray, elementsSorted);
+			MPI_Send(&(doneMessage), sizeof(int), MPI_INT, rank + 1, 0, MPI_COMM_WORLD);
+		}
+
 	// Estágios Intermediários
 	}else if( rank + 1 < size ){
-	
+		// Espera pela mensagem do estágio anterior
+		while(1) {
+			int valueReceived = 0;
+			MPI_Recv(&valueReceived, sizeof(int), MPI_INT, rank - 1, 0, MPI_COMM_WORLD, &status);
+			// Se recebeu a mensagem de fim, finaliza o loop
+			if( valueReceived == -1 ) {			
+				break;
+			// Ordena o vetor enquanto não estiver cheio
+			}else if( elementsSorted < pieceLength ) {
+				sortedArray[elementsSorted] = valueReceived;
+				insertionSort(sortedArray, sortedArrayPosition, sortedArray, elementSorted);
+				elementsSorted++;
+			// Se último valor de 'sortedArray' for menor do que o valor testado, envia para o próximo estágio
+			}else if( lastValue < valueReceived  ) {
+				//sortedArray[elementsSorted] = array[elementsSorted];
+				MPI_Send(&(valueReceived), sizeof(int), MPI_INT, rank + 1, 0, MPI_COMM_WORLD);	
+			// Senão, ordena e manda o último valor para o pŕoximo estágio			
+			}else {
+				sortedArray[elementsSorted] = array[elementsSorted]
+				insertionSort(sortedArray, sortedArrayPosition, sortedArray, elementSorted);
+				MPI_Send(&(sortedArray[elementsSorted]), sizeof(int), MPI_INT, rank + 1, 0, MPI_COMM_WORLD);
+			}
+		}
+		// Imprime o array de valores
+		printArray(sortedArray, elementsSorted);
+		MPI_Send(&(doneMessage), sizeof(int), MPI_INT, rank + 1, 0, MPI_COMM_WORLD);
 	// Ultimo Estágio	
 	}else{
-	
+		// Espera pela mensagem do estágio anterior
+		while(1) {
+			
+			// Recebe e ordena o valor recebido
+			MPI_Recv(&valueReceived, sizeof(int), MPI_INT, rank - 1, 0, MPI_COMM_WORLD, &status);
+			
+			// Insere e ordena
+			if( elementsSorted < pieceLength ) {
+				sortedArray[elementsSorted] = valueReceived;
+				insertionSort(sortedArray, sortedArrayPosition, sortedArray, elementSorted);
+				elementsSorted++;
+				// Se estiver cheio, inicia o processo de finalização
+				if( elementsSorted == pieceLength ) {
+					MPI_Send(&(doneMessage), sizeof(int), MPI_INT, 0, 0, MPI_COMM_WORLD);
+					MPI_Recv(&valueReceived, sizeof(int), MPI_INT, rank - 1, 0, MPI_COMM_WORLD, &status);
+					printArray(sortedArray, elementsSorted);
+					break;			
+				}
+			}
+		}
 	}
-
-
-	copyArrayToBuffer(sortedArray, array, 0, arrayLength);
 
 	MPI_Finalize();	
 
