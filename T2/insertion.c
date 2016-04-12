@@ -36,7 +36,7 @@ double getCurrentTimeMS(){
 void printArray(int* array, int length) {
 	int i = 0;
 	for(i = 0; i < length; i++) {
-		printf("%d ", array[i]);
+		printf("%d\n", array[i]);
 	}
 	printf("\n");
 }
@@ -99,11 +99,20 @@ int main(int argc, char **argv) {
 	int sortedArrayPosition = rank*pieceLength;
 	
 	#ifdef ENABLE_DEBUG_PRINTS
-		printf("%d initializing\n",rank);		
+		printf("%d initializing\n",rank);
 	#endif	
-
+    
+    if( size == 1 ) {
+        #ifdef ENABLE_DEBUG_PRINTS
+            printf("Initing - Sequential\n");
+        #endif
+        insertionSort(sortedArray, 0, array, arrayLength);
+        printArray(sortedArray, arrayLength);
 	// Primeiro Estágio do Pipe
-	if( rank == 0 ) {
+    }else if( rank == 0 ) {
+        #ifdef ENABLE_DEBUG_PRINTS
+            printArray(array, arrayLength);
+        #endif
 		for( int i = 0; i < arrayLength; i++, elementsSorted++ ) {
 
 			int lastValue = sortedArray[sortedArrayPosition + pieceLength - 1];
@@ -112,7 +121,7 @@ int main(int argc, char **argv) {
 			if( elementsSorted < pieceLength ) {
 
 				#ifdef ENABLE_DEBUG_PRINTS
-				//	printf("%d sorting array\n",rank);		
+					printf("%d sorting array\n",rank);		
 				#endif
 	
 				sortedArray[i] = array[i];
@@ -167,7 +176,7 @@ int main(int argc, char **argv) {
 		
 			MPI_Recv(&valueReceived, sizeof(int), MPI_INT, rank - 1, 0, MPI_COMM_WORLD, &status);
 			#ifdef ENABLE_DEBUG_PRINTS
-				printf("%d receiving %d, elementsSorted = %d\n",rank, valueReceived, elementsSorted);		
+			//	printf("%d receiving %d, elementsSorted = %d\n",rank, valueReceived, elementsSorted);
 			#endif	
 
 			// Se recebeu a mensagem de fim, finaliza o loop
