@@ -113,7 +113,7 @@ int main(int argc, char **argv) {
         #ifdef ENABLE_DEBUG_PRINTS
             printArray(array, arrayLength);
         #endif
-		for( int i = 0; i < arrayLength; i++, elementsSorted++ ) {
+		for( int i = 0; i < arrayLength; i++/*, elementsSorted++*/ ) {
 
 			int lastValue = sortedArray[sortedArrayPosition + pieceLength - 1];
 			
