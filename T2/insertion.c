@@ -7,7 +7,7 @@
 
 // Flag utilizada para utilização de prints
 // Comentar esta linha evita que os prints sejam compilados
-#define ENABLE_DEBUG_PRINTS
+//#define ENABLE_DEBUG_PRINTS
 
 // Realiza o Insertion Sort no vetor 'sourceArray' armazenando o resultado em 'targetArray'
 void insertionSort( int* targetArray, int targetArrayInitialPosition, int* sourceArray, int size ) {
@@ -103,6 +103,7 @@ int main(int argc, char **argv) {
 		printf("%d initializing\n",rank);
 	#endif	
     
+    // Sequencial
     if( size == 1 ) {
         initialTime = getCurrentTimeMS();
         #ifdef ENABLE_DEBUG_PRINTS
@@ -115,9 +116,11 @@ int main(int argc, char **argv) {
 	// Primeiro Estágio do Pipe
     }else if( rank == 0 ) {
         initialTime = getCurrentTimeMS();
-		for( int i = 0; i < arrayLength; i++/*, elementsSorted++*/ ) {
+        elementsSorted = pieceLength;
+        insertionSort(sortedArray, 0, array, pieceLength);
+		for( int i = elementsSorted; i < arrayLength; i++/*, elementsSorted++*/ ) {
 
-			int lastValue = sortedArray[sortedArrayPosition + pieceLength - 1];
+			int lastValue = sortedArray[elementsSorted - 1];
 			
 			// Ordena o vetor enquanto não estiver cheio			
 			if( elementsSorted < pieceLength ) {
@@ -127,7 +130,7 @@ int main(int argc, char **argv) {
 				#endif
 	
 				sortedArray[i] = array[i];
-				insertionSort(sortedArray, sortedArrayPosition, sortedArray, elementsSorted);
+				insertionSort(sortedArray, 0, sortedArray, elementsSorted);
 				elementsSorted++;
 			// Se último valor de 'sortedArray' for menor do que o valor testado, envia para o próximo estágio
 			}else if( lastValue < array[i]  ) {
@@ -142,8 +145,8 @@ int main(int argc, char **argv) {
 				#ifdef ENABLE_DEBUG_PRINTS
 					printf("%d sending current last value to next\n",rank);
 				#endif
-				sortedArray[elementsSorted] = array[elementsSorted];
-				insertionSort(sortedArray, sortedArrayPosition, sortedArray, elementsSorted);
+				sortedArray[elementsSorted] = array[i];
+				insertionSort(sortedArray, 0, sortedArray, elementsSorted + 1);
 				MPI_Send(&(sortedArray[elementsSorted]), sizeof(int), MPI_INT, rank + 1, 0, MPI_COMM_WORLD);
 			}		
 		}
@@ -192,16 +195,16 @@ int main(int argc, char **argv) {
 			// Ordena o vetor enquanto não estiver cheio
 			}else if( elementsSorted < pieceLength ) {
 				#ifdef ENABLE_DEBUG_PRINTS
-				//	printf("%d sorting array\n",rank);
+					printf("%d sorting array\n",rank);
 				#endif
 		
 				sortedArray[elementsSorted] = valueReceived;
-				insertionSort(sortedArray, sortedArrayPosition, sortedArray, elementsSorted);
+				insertionSort(sortedArray, 0, sortedArray, elementsSorted);
 				elementsSorted++;
 			// Se último valor de 'sortedArray' for menor do que o valor testado, envia para o próximo estágio
 			}else if( lastValue < valueReceived  ) {
 				#ifdef ENABLE_DEBUG_PRINTS
-				//	printf("%d sending value to next\n",rank);
+					printf("%d sending value to next\n",rank);
 				#endif
 
 				//sortedArray[elementsSorted] = array[elementsSorted];
@@ -209,11 +212,11 @@ int main(int argc, char **argv) {
 			// Senão, ordena e manda o último valor para o pŕoximo estágio			
 			}else {
 				#ifdef ENABLE_DEBUG_PRINTS
-				//	printf("%d sending current last value to next\n",rank);
+					printf("%d sending current last value to next\n",rank);
 				#endif
 
 				sortedArray[elementsSorted] = array[elementsSorted];
-				insertionSort(sortedArray, sortedArrayPosition, sortedArray, elementsSorted);
+				insertionSort(sortedArray, 0, sortedArray, elementsSorted + 1);
 				MPI_Send(&(sortedArray[elementsSorted]), sizeof(int), MPI_INT, rank + 1, 0, MPI_COMM_WORLD);
 			}
 		}
@@ -246,7 +249,7 @@ int main(int argc, char **argv) {
 				#endif			
 
 				sortedArray[elementsSorted] = valueReceived;
-				insertionSort(sortedArray, sortedArrayPosition, sortedArray, elementsSorted);
+				insertionSort(sortedArray, 0, sortedArray, elementsSorted);
 				elementsSorted++;
 				// Se estiver cheio, inicia o processo de finalização
 				if( elementsSorted == pieceLength ) {
