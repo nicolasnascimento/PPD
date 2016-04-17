@@ -171,8 +171,8 @@ int main(int argc, char **argv) {
         
         int depth = 1;
         int pieceLength;// = arrayLength/(pow(2, depth));
-        int childRank;// = rank + pow(2, depth - 1);
-        int parentRank;// = rank - pow(2, depth - 1);
+        int childRank = -1;// = rank + pow(2, depth - 1);
+        int parentRank = -1;// = rank - pow(2, depth - 1);
         
         if( rank == 0 ) {
             
@@ -198,7 +198,7 @@ int main(int argc, char **argv) {
 
 		while(1) {
             
-            if( rank != 0 ) {
+            if( rank != 0 && childRank != -1 && parentRank != -1 ) {
                 parentRank = rank - pow(2, depth - 1);
                 childRank = rank + pow(2, depth - 1);
             }
@@ -229,8 +229,8 @@ int main(int argc, char **argv) {
                 #endif
                 
 				depth++;
-				MPI_Send((buffer + pieceLength), sizeof(int)*pieceLength, MPI_INT, childRank, 0, MPI_COMM_WORLD);;
-				MPI_Send(&depth, sizeof(int),MPI_INT, childRank, 0, MPI_COMM_WORLD);
+				MPI_Send((buffer + pieceLength), pieceLength, MPI_INT, childRank, 0, MPI_COMM_WORLD);;
+				MPI_Send(&depth, sizeof(depth),MPI_INT, childRank, 0, MPI_COMM_WORLD);
 			}else{
                 #ifdef ENABLE_DEBUG_PRINTS
                     printf("%d sorting\n", rank);
@@ -247,7 +247,7 @@ int main(int argc, char **argv) {
                         #endif
                         
 						MPI_Send(buffer, pieceLength, MPI_INT, parentRank, 0, MPI_COMM_WORLD);
-						MPI_Send(&depth, sizeof(int),MPI_INT, parentRank, 0, MPI_COMM_WORLD);
+						MPI_Send(&depth, sizeof(depth),MPI_INT, parentRank, 0, MPI_COMM_WORLD);
                         break;
 					} else {
                         #ifdef ENABLE_DEBUG_PRINTS
