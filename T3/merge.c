@@ -198,9 +198,9 @@ int main(int argc, char **argv) {
 
 		while(1) {
             
-            if( rank != 0 && childRank != -1 && parentRank != -1 ) {
+            if( rank != 0 && childRank == -1 && parentRank == -1 ) {
                 parentRank = rank - pow(2, depth - 1);
-                childRank = rank + pow(2, depth - 1);
+                childRank = rank + pow(2, depth);
             }
             pieceLength = arrayLength/(pow(2, depth));
 
@@ -229,7 +229,7 @@ int main(int argc, char **argv) {
                 #endif
                 
 				depth++;
-				MPI_Send((buffer + pieceLength), pieceLength, MPI_INT, childRank, 0, MPI_COMM_WORLD);;
+				MPI_Send((buffer + pieceLength), pieceLength, MPI_INT, childRank, 0, MPI_COMM_WORLD);
 				MPI_Send(&depth, sizeof(depth),MPI_INT, childRank, 0, MPI_COMM_WORLD);
 			}else{
                 #ifdef ENABLE_DEBUG_PRINTS
