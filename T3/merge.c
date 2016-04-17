@@ -16,11 +16,39 @@ Gabriel Chiele, Nicolas Nascimento - 14/04/2016
 #include <stdio.h>
 #include <sys/time.h>
 #include <time.h>
+#include <math.h>
 
 #define ENABLE_DEBUG_PRINTS
 
 
-// Realiza o Merge Sort no vetor 'targetArray' 
+/* Rotina que faz o merge de duas partes de um vetor.
+ array[begin] até array[mid-1] e array[mid] até array[end-1].
+ Coloca o resultado em b e depois coloca todos os elementos
+ de b de volta para array (de begin até end).
+ */
+void merge(int array[], int begin, int mid, int end) {
+    int ib = begin;
+    int im = mid;
+    int j;
+    int size = end-begin;
+    int b[size];
+    
+    /* Enquanto existirem elementos na lista da esquerda ou direita */
+    for (j = 0; j < (size); j++)  {
+        if (ib < mid && (im >= end || array[ib] <= array[im]))  {
+            b[j] = array[ib];
+            ib = ib + 1;
+        }
+        else  {
+            b[j] = array[im];
+            im = im + 1;
+        }
+    }
+    
+    for (j=0, ib=begin; ib<end; j++, ib++) array[ib] = b[j];
+}
+
+// Realiza o Merge Sort no vetor 'targetArray'
 void mergeSort( int* array, int begin, int end ) {
 	int mid;
 	if( (begin == end) || (begin == end - 1) ) {
@@ -84,37 +112,11 @@ void concatenate(int* targetArray, int* sourceArray, int position, int length) {
 // Função auxiliar que mostar os valores em um array
 void printArray(int* array, int length) {
 	int i = 0;
+    printf("+++++++++++++++\n");
 	for(i = 0; i < length; i++) {
 		printf("%d ", array[i]);
 	}
 	printf("\n");
-}
-
-/* Rotina que faz o merge de duas partes de um vetor.
-  array[begin] até array[mid-1] e array[mid] até array[end-1].
-  Coloca o resultado em b e depois coloca todos os elementos
-  de b de volta para array (de begin até end).
-*/
-void merge(int array[], int begin, int mid, int end) {
-    int ib = begin;
-    int im = mid;
-    int j;
-    int size = end-begin;
-    int b[size];
-
-    /* Enquanto existirem elementos na lista da esquerda ou direita */
-    for (j = 0; j < (size); j++)  {
-        if (ib < mid && (im >= end || array[ib] <= array[im]))  {
-            b[j] = array[ib];
-            ib = ib + 1;
-        }
-        else  {
-            b[j] = array[im];
-            im = im + 1;
-        }
-    }
-
-    for (j=0, ib=begin; ib<end; j++, ib++) array[ib] = b[j];
 }
 
 // Retorna o tempo atual em milisegundos
@@ -159,54 +161,112 @@ int main(int argc, char **argv) {
 		#ifdef ENABLE_DEBUG_PRINTS
 			printf("total time = %lf\n", finalTime - initialTime);
 		#endif
-	}else if( rank == 0 ) {
+	}/*else if( rank == 0 ) {
 		
-	}else{
-		int depth = 1;
-		int pieceLength = arrayLength/(pow(2, depth));
-		int childRank = rank + pow(2, depth - 1)
-		int parentRank = rank - pow(2, depth - 1);
+	}*/else{
+        
+        #ifdef ENABLE_DEBUG_PRINTS
+            printf("%d initializing\n", rank);
+        #endif
+        
+        int depth = 1;
+        int pieceLength;// = arrayLength/(pow(2, depth));
+        int childRank;// = rank + pow(2, depth - 1);
+        int parentRank;// = rank - pow(2, depth - 1);
+        
+        if( rank == 0 ) {
+            
+            #ifdef ENABLE_DEBUG_PRINTS
+                printf("%d reading file\n", rank);
+            #endif
+            
+            getArrayFromFileWithName(array, fileName, arrayLength);
+            depth = 1;
+            pieceLength = arrayLength/(pow(2, depth));
+            childRank = 1;
+            parentRank = -1;
+            #ifdef ENABLE_DEBUG_PRINTS
+                printf("%d sending initial load of %d to child %d\n", rank, pieceLength, childRank);
+            #endif
+            
+            //printArray(array, arrayLength);
+            //printArray(array + pieceLength, pieceLength);
+            
+            MPI_Send((array + pieceLength), pieceLength, MPI_INT, childRank, 0, MPI_COMM_WORLD);
+            MPI_Send(&depth, sizeof(depth),MPI_INT, childRank, 0, MPI_COMM_WORLD);
+        }
 
 		while(1) {
-
-			parentRank = rank - pow(2, depth - 1);
-			pieceLength = arrayLength/(pow(2, depth));
+            
+            if( rank != 0 ) {
+                parentRank = rank - pow(2, depth - 1);
+                childRank = rank + pow(2, depth - 1);
+            }
+            pieceLength = arrayLength/(pow(2, depth));
 
 			int buffer[pieceLength];
 			int receivedBuffer[pieceLength];
 			int concatenatedBuffer[2*pieceLength];
 			
-			MPI_Recv(buffer, sizeof(int)*pieceLength, MPI_INT, parentRank, 0, MPI_COMM_WORLD, &status);
-			MPI_Recv(&depth, sizeof(int),MPI_INT, parentRank, 0, MPI_COMM_WORLD, &status);
+            if( rank != 0 ) {
+                #ifdef ENABLE_DEBUG_PRINTS
+                    printf("%d waiting to receive load of %d from parent %d\n", rank, pieceLength, parentRank);
+                #endif
+            
+                //while (1);
+                MPI_Recv(buffer, pieceLength, MPI_INT, parentRank, 0, MPI_COMM_WORLD, &status);
+                MPI_Recv(&depth, sizeof(depth),MPI_INT, parentRank, 0, MPI_COMM_WORLD, &status);
+                
+                #ifdef ENABLE_DEBUG_PRINTS
+                    printf("done receiving\n");
+                #endif
+            }
 		
 			if( pieceLength > arrayLength/(pow(2, size - 1)) ) {
+                
+                #ifdef ENABLE_DEBUG_PRINTS
+                    printf("%d sending to child %d\n", rank, childRank);
+                #endif
+                
 				depth++;
-				MPI_Send(buffer, sizeof(int)*pieceLength, MPI_INT, parentRank, 0, MPI_COMM_WORLD);;
+				MPI_Send((buffer + pieceLength), sizeof(int)*pieceLength, MPI_INT, childRank, 0, MPI_COMM_WORLD);;
 				MPI_Send(&depth, sizeof(int),MPI_INT, childRank, 0, MPI_COMM_WORLD);
 			}else{
-				mergeSort(buffer, pos, length);
+                #ifdef ENABLE_DEBUG_PRINTS
+                    printf("%d sorting\n", rank);
+                #endif
+                
+				mergeSort(buffer, 0, pieceLength);
 			
-				while(1) {
+				while( depth <= 0 ) {
 
 					if( rank >= pow(2, depth - 1) ) {
-						MPI_Send(buffer, sizeof(int)*pieceLength, MPI_INT, parentRank, 0, MPI_COMM_WORLD);
+                        
+                        #ifdef ENABLE_DEBUG_PRINTS
+                            printf("%d sending to parent %d\n", rank, parentRank);
+                        #endif
+                        
+						MPI_Send(buffer, pieceLength, MPI_INT, parentRank, 0, MPI_COMM_WORLD);
 						MPI_Send(&depth, sizeof(int),MPI_INT, parentRank, 0, MPI_COMM_WORLD);
-					}else{
-						MPI_Recv(receivedBuffer, sizeof(int)*pieceLength, MPI_INT, parentRank, 0, MPI_COMM_WORLD, &status);
-						MPI_Recv(&depth, sizeof(int),MPI_INT, parentRank, 0, MPI_COMM_WORLD, &status);
+                        break;
+					} else {
+                        #ifdef ENABLE_DEBUG_PRINTS
+                            printf("%d waiting for child %d\n", rank, childRank);
+                        #endif
+                        
+						MPI_Recv(receivedBuffer, pieceLength, MPI_INT, childRank, 0, MPI_COMM_WORLD, &status);
+						MPI_Recv(&depth, sizeof(int),MPI_INT, childRank, 0, MPI_COMM_WORLD, &status);
 					
 						copyArrayToBuffer(buffer, concatenatedBuffer, 0, pieceLength);
 						concatenate(concatenatedBuffer, receivedBuffer, pieceLength, 2*pieceLength);
 						merge(concatenatedBuffer, 0, pieceLength, 2*pieceLength);
 
-						depth--;			
-					}	
+						depth--;
+					}
 				}
 				break;		
-			}	
+			}
 		}
-		
-		
 	}
 
   	MPI_Finalize();
