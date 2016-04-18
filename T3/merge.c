@@ -229,8 +229,12 @@ int main(int argc, char **argv) {
             int receivedBuffer[pieceLength];
             //int concatenatedBuffer[arrayLength];
             
-            if( rank == 0 ) {
+            if( rank == 0 && firstTime == 0 ) {
                 copyArrayToBuffer(array, buffer, 0, arrayLength);
+                #ifdef ENABLE_DEBUG_PRINTS
+                    printf("%d - 2 copying array for self\n", rank);
+                    printArray(buffer, pieceLength);
+                #endif
             }
 
             if( rank != 0 && firstReception != 0 ) {
@@ -267,6 +271,8 @@ int main(int argc, char **argv) {
 			}else{
                 #ifdef ENABLE_DEBUG_PRINTS
                     printf("%d - 7 sorting\n", rank);
+                    printf("%d - 7.1 buffer to sort ", rank);
+                    printArray(buffer, pieceLength);
                 #endif
 
 				mergeSort(buffer, 0, pieceLength);
