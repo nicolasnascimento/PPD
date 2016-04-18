@@ -18,7 +18,7 @@ Gabriel Chiele, Nicolas Nascimento - 14/04/2016
 #include <time.h>
 #include <math.h>
 
-#define ENABLE_DEBUG_PRINTS
+//#define ENABLE_DEBUG_PRINTS
 
 
 /* Rotina que faz o merge de duas partes de um vetor.
@@ -207,6 +207,8 @@ int main(int argc, char **argv) {
             parentRank = -1;
             
             #ifdef ENABLE_DEBUG_PRINTS
+                printf("%d - 0 original array ", rank);
+                printArray(array, arrayLength);
                 printf("%d - 1 sending initial load of %d to child %d\n", rank, pieceLength, childRank);
             #endif
 
@@ -229,7 +231,7 @@ int main(int argc, char **argv) {
             int receivedBuffer[pieceLength];
             //int concatenatedBuffer[arrayLength];
             
-            if( rank == 0 && firstTime == 0 ) {
+            if( rank == 0 ) {
                 copyArrayToBuffer(array, buffer, 0, arrayLength);
                 #ifdef ENABLE_DEBUG_PRINTS
                     printf("%d - 2 copying array for self\n", rank);
