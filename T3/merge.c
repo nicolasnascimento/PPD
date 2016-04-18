@@ -220,6 +220,7 @@ int main(int argc, char **argv) {
         }
 
 		while(1) {
+            
 
             if( rank != 0 && parentRank == -1 ) {
                 parentRank = rank - pow(2, depth - 1);
@@ -230,6 +231,10 @@ int main(int argc, char **argv) {
             int buffer[pieceLength];
             int receivedBuffer[pieceLength];
             int concatenatedBuffer[2*pieceLength];
+            
+            if( rank == 0 ) {
+                copyArrayToBuffer(array, buffer, 0, arrayLength);
+            }
 
             if( rank != 0 && firstReception != 0 ) {
                 
@@ -249,13 +254,14 @@ int main(int argc, char **argv) {
 
             if( pieceLength > arrayLength/size ) {
 
-            #ifdef ENABLE_DEBUG_PRINTS
-                printf("%d - 6 sending load of %d to child %d\n", rank, pieceLength, childRank);
-            #endif
-
-            depth++;
-            pieceLength = arrayLength/(pow(2, depth));
-            MPI_Send((buffer + pieceLength), pieceLength, MPI_INT, childRank, 0, MPI_COMM_WORLD);
+                depth++;
+                pieceLength = arrayLength/(pow(2, depth));
+                
+                #ifdef ENABLE_DEBUG_PRINTS
+                    printf("%d - 6 sending load of %d to child %d\n", rank, pieceLength, childRank);
+                #endif
+                
+                MPI_Send((buffer + pieceLength), pieceLength, MPI_INT, childRank, 0, MPI_COMM_WORLD);
 			}else{
                 #ifdef ENABLE_DEBUG_PRINTS
                     printf("%d - 7 sorting\n", rank);
@@ -297,9 +303,8 @@ int main(int argc, char **argv) {
 						concatenate(concatenatedBuffer, receivedBuffer, pieceLength, 2*pieceLength);
 						merge(concatenatedBuffer, 0, pieceLength, 2*pieceLength);
                         
-                        if( depth == 0 ) {
+                        if( depth == 0 && rank == 0 ) {
                             printArray(concatenatedBuffer, 2*pieceLength);
-                            
                             break;
                         }
                         
