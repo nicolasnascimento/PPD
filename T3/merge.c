@@ -189,7 +189,7 @@ int main(int argc, char **argv) {
         #endif
 
         int depth = minimumDepthForRank(rank, size);
-        int pieceLength;// = arrayLength/(pow(2, depth));
+        int pieceLength = arrayLength/(pow(2, depth));
         int childRank = -1;// = rank + pow(2, depth - 1);
         int parentRank = -1;// = rank - pow(2, depth - 1);
         int firstReception = 1;//
@@ -217,7 +217,11 @@ int main(int argc, char **argv) {
 
             MPI_Send((array + pieceLength), pieceLength, MPI_INT, childRank, 0, MPI_COMM_WORLD);
         }
-
+        
+        int buffer[pieceLength];
+        int receivedBuffer[pieceLength];
+        int initialized = 0;
+        
 		while(1) {
             
 
@@ -227,12 +231,12 @@ int main(int argc, char **argv) {
             childRank = rank + pow(2, depth);
             pieceLength = arrayLength/(pow(2, depth));
 
-            int buffer[pieceLength];
-            int receivedBuffer[pieceLength];
+            
             //int concatenatedBuffer[arrayLength];
             
-            if( rank == 0 ) {
+            if( rank == 0 && initialized == 0 ) {
                 copyArrayToBuffer(array, buffer, 0, arrayLength);
+                initialized = 1;
                 #ifdef ENABLE_DEBUG_PRINTS
                     printf("%d - 2 copying array for self\n", rank);
                     printArray(buffer, pieceLength);
@@ -376,6 +380,7 @@ int main(int argc, char **argv) {
                         firstTime = 1;
                         
                         if( depth == 0 && rank == 0 ) {
+                            printf("Final Array = ");
                             printArray(concatenatedBuffer, 2*pieceLength);
                             break;
                         }
